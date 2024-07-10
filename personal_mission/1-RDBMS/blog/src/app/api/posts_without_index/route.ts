@@ -3,33 +3,30 @@ import { prisma } from "@/lib/db";
 import { NextResponse } from "next/server";
 
 export async function GET(req: NextApiRequest) {
-  const url = new URL(req.url!);
-  const searchParams = new URLSearchParams(url.searchParams);
-  const title = searchParams.get("title") || "";
+  try {
+    const url = new URL(req.url!);
+    const searchParams = new URLSearchParams(url.searchParams);
+    const title = searchParams.get("title") || "";
 
-  const start = Date.now();
-  let posts;
+    const start = Date.now();
 
-  if (title) {
-    posts = await prisma.postWithoutIndex.findMany({
-      where: {
-        title: title,
-      },
+    const posts = await prisma.postWithoutIndex.findMany({
+      where: title ? { title: title } : undefined,
       orderBy: {
         title: "asc",
       },
+      take: title ? undefined : 20,
     });
-  } else {
-    posts = await prisma.postWithoutIndex.findMany({
-      orderBy: {
-        title: "asc",
-      },
-      take: 20,
-    });
+
+    const end = Date.now();
+    const responseTime = end - start;
+
+    return NextResponse.json({ posts, responseTime });
+  } catch (error) {
+    console.error("Error fetching posts:", error);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
   }
-
-  const end = Date.now();
-  const responseTime = end - start;
-  // console.log({ posts, responseTime });
-  return NextResponse.json({ posts, responseTime });
 }

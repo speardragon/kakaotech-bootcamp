@@ -1,9 +1,11 @@
+// app/components/PostList.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { LucideIcon, Search } from "lucide-react";
+import React, { useState, useEffect, useCallback } from "react";
+import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import Loading from "./loading";
 
 interface Post {
   id: number;
@@ -20,23 +22,39 @@ const PostList: React.FC<PostListProps> = ({ endpoint, label }) => {
   const [title, setTitle] = useState("");
   const [posts, setPosts] = useState<Post[]>([]);
   const [responseTime, setResponseTime] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchPosts = useCallback(
+    async (searchTitle: string = "") => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/${endpoint}?title=${searchTitle}`);
+        if (!res.ok) {
+          throw new Error("서버에서 데이터를 가져오는데 실패했습니다.");
+        }
+        const data = await res.json();
+        setPosts(data.posts);
+        setResponseTime(data.responseTime);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "알 수 없는 에러가 발생했습니다."
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [endpoint]
+  );
 
   useEffect(() => {
-    const fetchInitialPosts = async () => {
-      const res = await fetch(`/api/${endpoint}`);
-      const data = await res.json();
-      setPosts(data.posts);
-      setResponseTime(data.responseTime);
-    };
-    fetchInitialPosts();
-  }, [endpoint]);
+    fetchPosts();
+  }, [fetchPosts]);
 
-  const fetchPosts = async () => {
-    const res = await fetch(`/api/${endpoint}?title=${title}`);
-    const data = await res.json();
-    setPosts(data.posts);
-    setResponseTime(data.responseTime);
-  };
+  const handleSearch = useCallback(() => {
+    fetchPosts(title);
+  }, [fetchPosts, title]);
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-lg">
@@ -48,10 +66,20 @@ const PostList: React.FC<PostListProps> = ({ endpoint, label }) => {
           placeholder="Search by title"
           className="flex-grow"
         />
-        <Button onClick={fetchPosts} className="flex items-center">
+        <Button
+          onClick={handleSearch}
+          className="flex items-center"
+          disabled={isLoading}
+        >
           <Search className="mr-2" /> 검색
         </Button>
       </div>
+      {isLoading && (
+        <div className="flex h-full w-full justify-center items-start mt-10">
+          <Loading />
+        </div>
+      )}
+      {error && <p className="text-sm text-red-500">{error}</p>}
       {responseTime !== null && (
         <p className="text-sm text-gray-500">응답 속도: {responseTime} ms</p>
       )}
